@@ -122,8 +122,17 @@ $dir = $env:ONEVALET_DIR
 if (-not $dir) {
     $dir = Join-Path $HOME '1valet\OneValet.Orchestrator'
     if (-not (Test-Path (Join-Path $dir '.git'))) {
-        $reply = Read-Host "Install into ${dir}? (Enter, or type another folder)"
-        if ($reply) { $dir = $reply }
+        # Keys pressed earlier (say, during the git install) mustn't become the answer: drop them, strip control
+        # characters, and ask again when nothing usable is left.
+        while ($true) {
+            try { while ([Console]::KeyAvailable) { [void][Console]::ReadKey($true) } } catch { }
+            $raw = Read-Host "Install into ${dir}? (Enter, or type another folder)"
+            $reply = ($raw -replace '\x1b\[[0-9;?]*[A-Za-z~]', '' -replace '[\x00-\x1f\x7f]', '').Trim()
+            if (-not $raw) { break }
+            if ($reply -match '^([A-Za-z]:\\|\\\\|~)') { $dir = $reply -replace '^~', $HOME; break }
+            Write-Host 'Type a full path (like C:\Users\you\1valet), or just press Enter.'
+        }
+        Info "Folder: $dir"
     }
 }
 Sync-Clone $dir
