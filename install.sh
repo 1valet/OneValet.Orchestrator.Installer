@@ -19,6 +19,15 @@ info() { echo "==> $*"; }
 die() { echo "error: $*" >&2; exit 1; }
 ask_line() { local reply; read -r -p "$1" reply </dev/tty || reply=""; echo "$reply"; }
 
+# The terminal's own device (/dev/ttys003, /dev/pts/1). start gets it as stdin, opened read-write: Claude Code (Bun)
+# fails with "EINVAL: invalid argument, kqueue" on /dev/tty, and on the device opened read-only.
+terminal_device() {
+    local t
+    t="$(ps -o tty= -p $$ 2>/dev/null | tr -d ' ')"
+    case "$t" in ''|'?'|'??') return 1 ;; esac
+    [ -c "/dev/$t" ] && echo "/dev/$t"
+}
+
 ensure_git_python() {
     if [ "$(uname -s)" = Darwin ]; then
         # Apple's Command Line Tools provide git and /usr/bin/python3.
@@ -121,7 +130,7 @@ add_launcher() {
 }
 
 main() {
-    local dir="${ONEVALET_DIR:-}" reply
+    local dir="${ONEVALET_DIR:-}" reply tty_dev
     echo "Installing the $APP_NAME"
     ensure_git_python
     if [ -z "$dir" ]; then
@@ -133,6 +142,7 @@ main() {
     add_launcher "$dir" || true
     info "Starting (next time: open \"$APP_NAME\", or run $dir/start.sh)"
     cd "$dir"
+    if tty_dev="$(terminal_device)"; then exec ./start.sh "$@" <>"$tty_dev"; fi
     exec ./start.sh "$@" </dev/tty
 }
 
