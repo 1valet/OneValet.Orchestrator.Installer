@@ -91,7 +91,9 @@ function Sync-Clone($dir) {
     if ((Test-Path $dir) -and (Get-ChildItem -Force $dir)) { Die "$dir exists and isn't a clone of the orchestrator" }
     $mode = Confirm-Access
     Info "Cloning the orchestrator into $dir"
-    New-Item -ItemType Directory -Force (Split-Path $dir) | Out-Null
+    # Only when it's missing: New-Item can't create a drive root (D:\ for D:\orca).
+    $parent = Split-Path $dir
+    if ($parent -and -not (Test-Path $parent)) { New-Item -ItemType Directory -Force $parent | Out-Null }
     $env:GIT_SSH_COMMAND = Get-SshCommand $mode
     git clone -q $RepoUrl $dir
     $ok = $LASTEXITCODE -eq 0

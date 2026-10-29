@@ -174,7 +174,9 @@ clone_or_update() {
 }
 
 # A launcher that opens a terminal and runs start: an app in ~/Applications (Spotlight, Dock) on macOS, a menu
-# entry on Linux desktops. None on WSL (start it from Windows Terminal).
+# entry on Linux desktops. None on WSL (start it from Windows Terminal). ORCH_LAUNCHER=1 tells start the Terminal
+# window is its own to close when herdr is already open in another (bin/orch switch_to_attached; ensure_launcher
+# makes an older app again).
 add_launcher() {
     local dir="$1" app desktop
     if [ "$(uname -s)" = Darwin ]; then
@@ -184,7 +186,7 @@ add_launcher() {
         osacompile -o "$app" \
             -e 'tell application "Terminal"' \
             -e 'activate' \
-            -e "do script \"cd '$dir' && ./start.sh\"" \
+            -e "do script \"cd '$dir' && ORCH_LAUNCHER=1 ./start.sh\"" \
             -e 'end tell' >/dev/null 2>&1 && info "Added $app (find it with Spotlight, or drag it to the Dock)"
     elif ! grep -qi microsoft /proc/version 2>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
         desktop="$HOME/.local/share/applications/onevalet-orchestrator.desktop"
