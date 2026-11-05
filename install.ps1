@@ -24,7 +24,7 @@ function Install-Git {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         Die 'git is missing and so is winget: install Git for Windows (https://git-scm.com/download/win), then run this again'
     }
-    Info 'Installing Git for Windows (winget)'
+    Info 'Installing Git for Windows with winget (a few minutes; Windows may ask for permission, check the taskbar)'
     winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements
     Update-Path
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Die 'git installed but not found; open a new terminal and run this again' }
@@ -90,12 +90,12 @@ function Sync-Clone($dir) {
     }
     if ((Test-Path $dir) -and (Get-ChildItem -Force $dir)) { Die "$dir exists and isn't a clone of the orchestrator" }
     $mode = Confirm-Access
-    Info "Cloning the orchestrator into $dir"
+    Info "Cloning the orchestrator into $dir (a minute or so)"
     # Only when it's missing: New-Item can't create a drive root (D:\ for D:\orca).
     $parent = Split-Path $dir
     if ($parent -and -not (Test-Path $parent)) { New-Item -ItemType Directory -Force $parent | Out-Null }
     $env:GIT_SSH_COMMAND = Get-SshCommand $mode
-    git clone -q $RepoUrl $dir
+    git clone $RepoUrl $dir
     $ok = $LASTEXITCODE -eq 0
     Remove-Item Env:GIT_SSH_COMMAND
     if (-not $ok) { Die 'git clone failed' }

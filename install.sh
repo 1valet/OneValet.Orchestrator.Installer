@@ -69,7 +69,8 @@ install_clt_softwareupdate() {
         die "Software Update doesn't offer the Command Line Tools; install them from https://developer.apple.com/download/all/ and run this again"
     fi
     info "Installing $label (macOS asks for your password; this takes a few minutes)"
-    sudo softwareupdate -i "$label" </dev/tty || { rm -f "$marker"; die "installing $label failed"; }
+    sudo -p "Your Mac login password (to install the Command Line Tools; nothing shows as you type): " \
+        softwareupdate -i "$label" </dev/tty || { rm -f "$marker"; die "installing $label failed"; }
     rm -f "$marker"
 }
 
@@ -77,7 +78,7 @@ install_clt_softwareupdate() {
 # (cancelled, or refused for disk space), or nothing is installed after 30 minutes, fall back to softwareupdate.
 install_clt() {
     local waited=0
-    info "Installing Apple's Command Line Tools (git, python3): finish the installer that opens"
+    info "Installing Apple's Command Line Tools (git, python3; 5-15 minutes): finish the installer that opens"
     xcode-select --install >/dev/null 2>&1 || true
     sleep 5
     while ! xcode-select -p >/dev/null 2>&1; do
@@ -105,8 +106,9 @@ ensure_git_python() {
         xcode-select -p >/dev/null 2>&1 || install_clt
     elif ! command -v git >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
         command -v apt-get >/dev/null 2>&1 || die "install git and python3, then run this again"
-        info "Installing git and python3 (sudo)"
-        sudo apt-get update -qq && sudo apt-get install -y -qq git python3 </dev/tty
+        info "Installing git and python3 with apt (a minute or two)"
+        sudo -p "Your password (to install git and python3; nothing shows as you type): " apt-get update -qq \
+            && sudo apt-get install -y git python3 </dev/tty
     fi
 }
 
@@ -166,9 +168,9 @@ clone_or_update() {
     fi
     [ ! -e "$dir" ] || [ -z "$(ls -A "$dir")" ] || die "$dir exists and isn't a clone of the orchestrator"
     ensure_access
-    info "Cloning the orchestrator into $dir"
+    info "Cloning the orchestrator into $dir (a minute or so)"
     mkdir -p "$(dirname "$dir")"
-    GIT_SSH_COMMAND="$(ssh_command)" git clone -q "$REPO_URL" "$dir"
+    GIT_SSH_COMMAND="$(ssh_command)" git clone "$REPO_URL" "$dir"
     # Like orch clone: a clone made with the key keeps using it, without an ssh config.
     [ "$SSH_MODE" = default ] || git -C "$dir" config core.sshCommand "ssh -i '$VSTS_KEY' -o IdentitiesOnly=yes"
 }
