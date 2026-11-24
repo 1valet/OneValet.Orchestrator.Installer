@@ -14,7 +14,15 @@ $VstsKeysUrl = 'https://dev.azure.com/onevalet/_usersSettings/keys'
 $AppName = '1VALET Orchestrator'
 
 function Die($message) { Write-Host "error: $message" -ForegroundColor Red; throw $message }
-function Info($message) { Write-Host "==> $message" }
+function Info($message) { Set-OrcaTitle "installing: $message"; Write-Host "==> $message" }
+# The window's title follows the steps; every question (Read-Host, shadowed here) starts with "Orca needs you:" in its
+# own colour and the bell once, as start.ps1 (Set-OrcaTitle, Show-NeedsYou). Redirected: plain text, no title.
+function Set-OrcaTitle($what) { if (-not [Console]::IsOutputRedirected) { try { $Host.UI.RawUI.WindowTitle = "Orca $([char]0x00B7) $what" } catch { } } }
+function Read-Host {
+    if ([Console]::IsOutputRedirected) { Write-Host 'Orca needs you: ' -NoNewline }
+    else { Set-OrcaTitle 'needs you'; Write-Host "$([char]7)Orca needs you: " -NoNewline -ForegroundColor Yellow }
+    Microsoft.PowerShell.Utility\Read-Host @args
+}
 function Update-Path {
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + [Environment]::GetEnvironmentVariable('Path', 'Machine')
 }

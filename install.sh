@@ -15,9 +15,24 @@ VSTS_KEY="$HOME/.ssh/onevalet_vsts_rsa"
 VSTS_KEYS_URL="https://dev.azure.com/onevalet/_usersSettings/keys"
 APP_NAME="1VALET Orchestrator"
 
-info() { echo "==> $*"; }
+# The window's title follows each step, and a question or wait on the developer starts "Orca needs you:" in its own
+# colour with the bell once (as bin/orch's start: orca_title, needs_you; $1: where to look, on its own line); a
+# terminal only, else plain text.
+orca_tty() { [ -t 2 ] && [ "${TERM:-dumb}" != dumb ]; }  # stderr: ask_line runs inside $(...)
+needs_you() {
+    if orca_tty; then printf '\033]0;Orca · needs you\007\a\033[1;38;5;208mOrca needs you:\033[0m ' >&2; else printf 'Orca needs you: ' >&2; fi
+    [ -z "${1:-}" ] || echo "$1" >&2
+}
+info() { ! orca_tty || printf '\033]0;Orca · installing: %s\007' "$*" >&2; echo "==> $*"; }
 die() { echo "error: $*" >&2; exit 1; }
-ask_line() { local reply; read -r -p "$1" reply </dev/tty || reply=""; echo "$reply"; }
+ask_line() { local reply; needs_you; read -r -p "$1" reply </dev/tty || reply=""; echo "$reply"; }
+# sudo's password asked first, marked, only when sudo will ask ($1: the prompt); then the step's title ($2) again.
+sudo_ask() {
+    sudo -n true 2>/dev/null && return 0
+    needs_you
+    sudo -p "$1" -v </dev/tty || return 1
+    ! orca_tty || printf '\033]0;Orca · installing: %s\007' "$2" >&2
+}
 
 # Drop what was typed into the terminal before a question (say, keys pressed during a long wait), so it isn't taken
 # as the answer. python3 is there by then (Command Line Tools); without it, nothing is dropped.
@@ -69,8 +84,8 @@ install_clt_softwareupdate() {
         die "Software Update doesn't offer the Command Line Tools; install them from https://developer.apple.com/download/all/ and run this again"
     fi
     info "Installing $label (macOS asks for your password; this takes a few minutes)"
-    sudo -p "Your Mac login password (to install the Command Line Tools; nothing shows as you type): " \
-        softwareupdate -i "$label" </dev/tty || { rm -f "$marker"; die "installing $label failed"; }
+    { sudo_ask "Your Mac login password (to install the Command Line Tools; nothing shows as you type): " "$label" \
+        && sudo softwareupdate -i "$label" </dev/tty; } || { rm -f "$marker"; die "installing $label failed"; }
     rm -f "$marker"
 }
 
@@ -80,6 +95,7 @@ install_clt() {
     local waited=0
     info "Installing Apple's Command Line Tools (git, python3; 5-15 minutes): finish the installer that opens"
     xcode-select --install >/dev/null 2>&1 || true
+    needs_you "finish Apple's Command Line Tools installer window (it may be behind this one)"
     sleep 5
     while ! xcode-select -p >/dev/null 2>&1; do
         if ! pgrep -f "Install Command Line Developer Tools" >/dev/null 2>&1; then
@@ -107,8 +123,8 @@ ensure_git_python() {
     elif ! command -v git >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
         command -v apt-get >/dev/null 2>&1 || die "install git and python3, then run this again"
         info "Installing git and python3 with apt (a minute or two)"
-        sudo -p "Your password (to install git and python3; nothing shows as you type): " apt-get update -qq \
-            && sudo apt-get install -y git python3 </dev/tty
+        sudo_ask "Your password (to install git and python3; nothing shows as you type): " "git and python3" \
+            && sudo apt-get update -qq && sudo apt-get install -y git python3 </dev/tty
     fi
 }
 
