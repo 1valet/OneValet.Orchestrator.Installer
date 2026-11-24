@@ -175,27 +175,19 @@ clone_or_update() {
     [ "$SSH_MODE" = default ] || git -C "$dir" config core.sshCommand "ssh -i '$VSTS_KEY' -o IdentitiesOnly=yes"
 }
 
-# A launcher that opens a terminal and runs start: an app in ~/Applications (Spotlight, Dock) on macOS, a menu
-# entry on Linux desktops. None on WSL (start it from Windows Terminal). ORCH_LAUNCHER=1 tells start the Terminal
-# window is its own to close when herdr is already open in another (bin/orch switch_to_attached; ensure_launcher
-# makes an older app again).
+# A launcher that opens a terminal and runs start: a menu entry on Linux desktops (named $APP_NAME: GNOME's screen
+# reader is called Orca). None on WSL (start it from Windows Terminal). On a Mac start (run next) makes the app "Orca"
+# in ~/Applications (Spotlight, Dock), Orca's copy of Ghostty (bin/orch ensure_ghostty, ensure_orca_terminal).
 add_launcher() {
-    local dir="$1" app desktop
+    local dir="$1" desktop
     if [ "$(uname -s)" = Darwin ]; then
-        app="$HOME/Applications/$APP_NAME.app"
-        [ -d "$app" ] && return 0
-        mkdir -p "$HOME/Applications"
-        osacompile -o "$app" \
-            -e 'tell application "Terminal"' \
-            -e 'activate' \
-            -e "do script \"cd '$dir' && ORCH_LAUNCHER=1 ./start.sh\"" \
-            -e 'end tell' >/dev/null 2>&1 && info "Added $app (find it with Spotlight, or drag it to the Dock)"
+        return 0
     elif ! grep -qi microsoft /proc/version 2>/dev/null && [ -n "${XDG_CURRENT_DESKTOP:-}" ]; then
         desktop="$HOME/.local/share/applications/onevalet-orchestrator.desktop"
         [ -f "$desktop" ] && return 0
         mkdir -p "$(dirname "$desktop")"
-        printf '[Desktop Entry]\nType=Application\nName=%s\nExec=bash -c "cd '\''%s'\'' && ./start.sh"\nTerminal=true\n' \
-            "$APP_NAME" "$dir" > "$desktop"
+        printf '[Desktop Entry]\nType=Application\nName=%s\nExec=bash -c "cd '\''%s'\'' && ./start.sh"\nIcon=%s/icon/orca-icon.png\nTerminal=true\n' \
+            "$APP_NAME" "$dir" "$dir" > "$desktop"
         info "Added \"$APP_NAME\" to your applications menu"
     fi
 }
@@ -212,7 +204,7 @@ main() {
     info "Folder: $dir"
     clone_or_update "$dir"
     add_launcher "$dir" || true
-    info "Starting (next time: open \"$APP_NAME\", or run $dir/start.sh)"
+    info "Starting (next time: open \"Orca\" (Linux: \"$APP_NAME\"), or run $dir/start.sh)"
     cd "$dir"
     if tty_dev="$(terminal_device)"; then exec ./start.sh "$@" <>"$tty_dev"; fi
     exec ./start.sh "$@" </dev/tty

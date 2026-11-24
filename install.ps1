@@ -103,19 +103,28 @@ function Sync-Clone($dir) {
     if ($mode -eq 'key') { git -C $dir config core.sshCommand "ssh -i '$($VstsKey -replace '\\', '/')' -o IdentitiesOnly=yes" }
 }
 
-# Start menu (searchable) and Desktop shortcuts that open PowerShell running start.ps1.
+# Start menu (searchable) and Desktop shortcuts that open PowerShell running start.ps1: in Windows Terminal's profile
+# "Orca" (the Mac's look, which start adds) when Windows Terminal is installed, maximized, as start.ps1 rewires them;
+# -Launcher: a second click brings the open Orca to the front (start.ps1). Named Orca (2026-11-23); start.ps1 renames
+# older "1VALET Orchestrator" ones, so none is added beside one.
 function Add-Shortcuts($dir) {
     $shell = New-Object -ComObject WScript.Shell
+    $wt = (Get-Command wt.exe -ErrorAction SilentlyContinue).Source
+    # The app execution alias, never the versioned Store folder a Terminal update removes (like start.ps1).
+    $alias = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\wt.exe'
+    if (Test-Path $alias) { $wt = $alias } elseif ($wt -like '*\Program Files\WindowsApps\*') { $wt = $null }
     foreach ($folder in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) {
-        $path = Join-Path $folder "$AppName.lnk"
-        if (Test-Path $path) { continue }
+        $path = Join-Path $folder 'Orca.lnk'
+        if ((Test-Path $path) -or (Test-Path (Join-Path $folder "$AppName.lnk"))) { continue }
         $link = $shell.CreateShortcut($path)
         $link.TargetPath = (Get-Command powershell).Source
-        $link.Arguments = "-NoExit -ExecutionPolicy Bypass -File `"$(Join-Path $dir 'start.ps1')`""
+        $link.Arguments = "-NoExit -ExecutionPolicy Bypass -File `"$(Join-Path $dir 'start.ps1')`" -Launcher"
+        if ($wt) { $link.Arguments = "-M -p `"Orca`" powershell.exe $($link.Arguments)"; $link.TargetPath = $wt }
         $link.WorkingDirectory = $dir
+        $link.IconLocation = "$(Join-Path $dir 'icon\orca-icon.ico'),0"
         $link.Save()
     }
-    Info "Added `"$AppName`" to the Start menu and the Desktop"
+    Info "Added `"Orca`" to the Start menu and the Desktop"
 }
 
 Write-Host "Installing the $AppName"
@@ -138,8 +147,16 @@ if (-not $dir) {
     }
 }
 Sync-Clone $dir
+# Windows Terminal, which Orca's shortcuts open (the developer, 2026-11-23), installed with winget when missing; start.ps1
+# does the same and warns when it can't (the shortcuts then open the plain console).
+if (-not (Get-Command wt.exe -ErrorAction SilentlyContinue) -and (Get-Command winget -ErrorAction SilentlyContinue) -and
+    -not @(Get-AppxPackage -Name 'Microsoft.WindowsTerminal*' -ErrorAction SilentlyContinue).Count) {
+    Info 'Installing Windows Terminal with winget (Orca opens in it; Windows may ask for permission, check the taskbar)'
+    winget install --id Microsoft.WindowsTerminal -e --accept-source-agreements --accept-package-agreements
+    Update-Path
+}
 try { Add-Shortcuts $dir } catch { Write-Host "     (no shortcuts: $_)" }
-Info "Starting (next time: open `"$AppName`" from the Start menu, or run start.ps1 in $dir)"
+Info "Starting (next time: open `"Orca`" from the Start menu, or run start.ps1 in $dir)"
 Set-Location $dir
 powershell -ExecutionPolicy Bypass -File (Join-Path $dir 'start.ps1')
 }
